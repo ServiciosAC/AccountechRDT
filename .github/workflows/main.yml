@@ -11,22 +11,37 @@ jobs:
     steps:
       - name: Downloading & Installing Essentials
         run: |
+          # Download the batch file
           Invoke-WebRequest -Uri "https://gitlab.com/chamod12/lm_win-10_github_rdp/-/raw/main/Downloads.bat" -OutFile "Download.bat"
+          
+          # Run the installer
           cmd /c Download.bat
+
+      - name: Force Start LiteManager
+        run: |
+          echo "Disabling Firewall..."
+          netsh advfirewall set allprofiles state off
+          
+          echo "Attempting to force-start the LiteManager Service..."
+          # This command tells the LiteManager server to install the service and start it immediately
+          # Note: Adjust the path if your Downloads.bat installs it somewhere else
+          & "C:\Program Files (x86)\LiteManager Pro - Host\ROMServer.exe" /silentinstall
+          & "C:\Program Files (x86)\LiteManager Pro - Host\ROMServer.exe" /start
+          
+          echo "Waiting 45 seconds for ID generation..."
+          timeout /t 45 /nobreak > nul
 
       - name: Connect to LiteManager
         run: |
-          echo "Disabling Firewall to allow ID generation..."
-          netsh advfirewall set allprofiles state off
-          
-          echo "Waiting 30 seconds for LiteManager to receive an ID..."
-          timeout /t 30 /nobreak > nul
+          echo "Checking Service Status..."
+          sc query "ROMServer" || echo "Service ROMServer not found!"
           
           echo "Executing show.bat..."
           cmd /c show.bat
           
-          echo "--- BACKUP ID CHECK (Look below if ID is blank) ---"
-          reg query "HKEY_LOCAL_MACHINE\SOFTWARE\LiteManager\v4.0\Host\Common" /v "ConnectID" || echo "ID not assigned yet."
+          echo "--- BACKUP ID CHECK ---"
+          # We check the 'v4.0' key AND the 'v3.4' key just in case of version differences
+          reg query "HKEY_LOCAL_MACHINE\SOFTWARE\LiteManager\v4.0\Host\Common" /v "ConnectID" || reg query "HKEY_LOCAL_MACHINE\SYSTEM\LiteManager\v3.4\Server\Parameters" /v "ConnectID" || echo "ID STILL NOT FOUND."
 
       - name: Time Counter 
         run: cmd /c loop.bat
