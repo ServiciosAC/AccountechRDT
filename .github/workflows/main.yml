@@ -1,48 +1,58 @@
-name: Windows - Litemanager
+name: Ultimate - Windows RDP
 
 on:
   workflow_dispatch:
 
 jobs:
   build:
-    name: Start Building
+    name: Start RDP Session
     runs-on: windows-latest
+    timeout-minutes: 360 # Keeps the VM alive for 6 hours
 
     steps:
-      - name: Downloading & Installing Essentials
+      - name: 1. Download & Install LiteManager (Official)
         run: |
-          # Download the batch file
-          Invoke-WebRequest -Uri "https://gitlab.com/chamod12/lm_win-10_github_rdp/-/raw/main/Downloads.bat" -OutFile "Download.bat"
+          echo "Downloading official LiteManager Host..."
+          Invoke-WebRequest -Uri "https://litemanager.com/files/LiteManager%20Pro%20-%20Server.msi" -OutFile "LMSERVER.msi"
           
-          # Run the installer
-          cmd /c Download.bat
-
-      - name: Force Start LiteManager
+          echo "Installing (Silent Mode)..."
+          Start-Process msiexec.exe -ArgumentList "/i LMSERVER.msi /qn /norestart" -Wait
+          
+      - name: 2. Configure Security & Firewall
         run: |
-          echo "Disabling Firewall..."
+          echo "Setting RDP Password to: TheDisa1a"
+          # This command injects the password and settings directly into the registry
+          $regPath = "HKLM:\SOFTWARE\LiteManager\v4.0\Host\Common"
+          if (!(Test-Path $regPath)) { New-Item -Path $regPath -Force }
+          Set-ItemProperty -Path $regPath -Name "Password" -Value "TheDisa1a"
+          
+          echo "Opening Firewall..."
           netsh advfirewall set allprofiles state off
-          
-          echo "Attempting to force-start the LiteManager Service..."
-          # This command tells the LiteManager server to install the service and start it immediately
-          # Note: Adjust the path if your Downloads.bat installs it somewhere else
-          & "C:\Program Files (x86)\LiteManager Pro - Host\ROMServer.exe" /silentinstall
-          & "C:\Program Files (x86)\LiteManager Pro - Host\ROMServer.exe" /start
-          
-          echo "Waiting 45 seconds for ID generation..."
-          timeout /t 45 /nobreak > nul
 
-      - name: Connect to LiteManager
+      - name: 3. Start Service & Generate ID
         run: |
-          echo "Checking Service Status..."
-          sc query "ROMServer" || echo "Service ROMServer not found!"
+          echo "Starting ROMServer Service..."
+          net start ROMServer
           
-          echo "Executing show.bat..."
-          cmd /c show.bat
-          
-          echo "--- BACKUP ID CHECK ---"
-          # We check the 'v4.0' key AND the 'v3.4' key just in case of version differences
-          reg query "HKEY_LOCAL_MACHINE\SOFTWARE\LiteManager\v4.0\Host\Common" /v "ConnectID" || reg query "HKEY_LOCAL_MACHINE\SYSTEM\LiteManager\v3.4\Server\Parameters" /v "ConnectID" || echo "ID STILL NOT FOUND."
+          echo "Waiting 60 seconds for the ID Server to respond..."
+          # This replaces the 'timeout' command which was crashing your script
+          powershell -Command "Start-Sleep -s 60"
 
-      - name: Time Counter 
-        run: cmd /c loop.bat
+      - name: 4. Display Connection Details
+        run: |
+          $id = (Get-ItemProperty -Path "HKLM:\SOFTWARE\LiteManager\v4.0\Host\Common").ConnectID
+          echo "=========================================="
+          echo "        WINDOWS RDP IS READY!             "
+          echo "=========================================="
+          echo " USERNAME: runneradmin"
+          echo " PASSWORD: TheDisa1a"
+          echo " LITEMANAGER ID: $id"
+          echo "=========================================="
+          
+          if (!$id) { echo "ERROR: ID still not generated. Try restarting the workflow." }
+
+      - name: 5. Keep Alive
+        run: |
+          echo "Keep-alive loop started. Session will last 6 hours."
+          while($true) { Start-Sleep -Seconds 3600 }
     
