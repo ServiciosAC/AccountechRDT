@@ -16,11 +16,18 @@ jobs:
 
       - name: Connect to LiteManager
         run: |
-          # Wait 30 seconds for the ID server to respond
+          echo "Disabling Firewall to allow ID generation..."
+          netsh advfirewall set allprofiles state off
+          
+          echo "Waiting 30 seconds for LiteManager to receive an ID..."
           timeout /t 30 /nobreak > nul
-          # Now run the show script
-          cmd /c show.bat  
-        
+          
+          echo "Executing show.bat..."
+          cmd /c show.bat
+          
+          echo "--- BACKUP ID CHECK (Look below if ID is blank) ---"
+          reg query "HKEY_LOCAL_MACHINE\SOFTWARE\LiteManager\v4.0\Host\Common" /v "ConnectID" || echo "ID not assigned yet."
+
       - name: Time Counter 
         run: cmd /c loop.bat
     
