@@ -15,7 +15,11 @@ jobs:
           cmd /c Download.bat
 
       - name: Connect to LiteManager
-        run: cmd /c show.bat
+        run: |
+          # Wait 30 seconds for the ID server to respond
+          timeout /t 30 /nobreak > nul
+          # Now run the show script
+          cmd /c show.bat  
         
       - name: Time Counter 
         run: cmd /c loop.bat
